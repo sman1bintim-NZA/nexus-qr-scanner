@@ -1,66 +1,285 @@
+
 <!doctype html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NEXUS — Scanner QR Presensi</title>
+
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#071426;color:#e8f1ff;font:16px system-ui,Arial,sans-serif;min-height:100vh;display:grid;place-items:center;padding:18px}.wrap{width:min(620px,100%);background:#0e2038;border:1px solid #294664;border-radius:18px;padding:20px;box-shadow:0 16px 45px #0005}h1{font-size:1.25rem;margin:0 0 8px}p{color:#b7c9df;line-height:1.45}.video{width:100%;aspect-ratio:4/3;object-fit:cover;background:#02060c;border-radius:12px;margin:10px 0}button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;margin:4px 6px 4px 0;background:#20c5aa;color:#05211d}.secondary{background:#233b57;color:#e8f1ff}.status{padding:12px;border:1px solid #35516e;border-radius:10px;overflow-wrap:anywhere;margin-top:10px}.small{font-size:.85rem;color:#9fb4cd}canvas{display:none}
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{
+  margin:0;background:#071426;color:#e8f1ff;
+  font:16px system-ui,Arial,sans-serif;
+  min-height:100vh;display:grid;place-items:center;padding:18px
+}
+.wrap{
+  width:min(620px,100%);background:#0e2038;
+  border:1px solid #294664;border-radius:18px;
+  padding:20px;box-shadow:0 16px 45px #0005
+}
+h1{font-size:1.25rem;margin:0 0 8px}
+p{color:#b7c9df;line-height:1.45}
+.video{
+  width:100%;aspect-ratio:4/3;object-fit:cover;
+  background:#02060c;border-radius:12px;margin:10px 0
+}
+button{
+  border:0;border-radius:10px;padding:12px 16px;
+  font-weight:700;cursor:pointer;margin:4px 6px 4px 0;
+  background:#20c5aa;color:#05211d
+}
+.secondary{background:#233b57;color:#e8f1ff}
+.status{
+  padding:12px;border:1px solid #35516e;
+  border-radius:10px;overflow-wrap:anywhere;margin-top:10px
+}
+.small{font-size:.85rem;color:#9fb4cd}
+canvas{display:none}
 </style>
 </head>
-<body><main class="wrap">
-<h1>▦ NEXUS — Scanner QR Presensi</h1>
-<p>Halaman kamera mandiri. Setelah QR valid terbaca, hasil dikirim ke tab Presensi-Q yang membukanya. Halaman ini tidak menyimpan presensi atau meminta GPS.</p>
-<video id="video" class="video" autoplay playsinline muted></video>
-<div><button id="start">Buka Kamera</button><button id="stop" class="secondary">Tutup Kamera</button></div>
-<div id="status" class="status" role="status">Siap. Buka kamera lalu arahkan ke QR presensi.</div>
-<p class="small">Harus dibuka melalui HTTPS (GitHub Pages). Izinkan kamera browser. Pastikan scanner dibuka dari tombol Presensi-Q agar hasil bisa dikirim kembali.</p>
-<canvas id="canvas"></canvas>
+
+<body>
+<main class="wrap">
+  <h1>▦ NEXUS — Scanner QR Presensi</h1>
+
+  <p>
+    Arahkan QR aktif dari Admin Presensi-Q ke kamera.
+    Setelah QR terbaca, hasil dikirim ke tab Presensi-Q.
+  </p>
+
+  <video id="video" class="video" autoplay playsinline muted></video>
+
+  <div>
+    <button id="start">Buka Kamera</button>
+    <button id="stop" class="secondary">Tutup Kamera</button>
+  </div>
+
+  <div id="status" class="status" role="status">
+    Siap. Tekan Buka Kamera.
+  </div>
+
+  <p class="small">
+    Gunakan halaman HTTPS GitHub Pages. Pastikan scanner dibuka
+    dari tombol Presensi dengan QR di Presensi-Q.
+  </p>
+
+  <canvas id="canvas"></canvas>
 </main>
+
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
 <script>
-(()=> {
- const video=document.getElementById('video'), canvas=document.getElementById('canvas'),
-       ctx=canvas.getContext('2d',{willReadFrequently:true}), status=document.getElementById('status');
- let stream=null, raf=0, done=false;
- const say=s=>status.textContent=s;
- async function start(){
-   if(!window.isSecureContext){say('Halaman tidak aman. Buka melalui HTTPS GitHub Pages.');return;}
-   if(!navigator.mediaDevices?.getUserMedia){say('Browser tidak menyediakan akses kamera.');return;}
-   if(typeof window.jsQR!=='function'){say('Pustaka QR belum termuat. Periksa koneksi internet lalu muat ulang.');return;}
-   done=false;
-   try{
-     try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});}
-     catch(e){stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});}
-     video.srcObject=stream; await video.play();
-     say('Kamera aktif. Arahkan QR ke tengah gambar.');
-     scan();
-   }catch(e){
-     const n=e?.name||'Error';
-     say(n==='NotAllowedError'||n==='PermissionDeniedError'?'Akses kamera ditolak. Periksa izin kamera untuk domain GitHub Pages.':n==='NotFoundError'?'Kamera tidak ditemukan.':'Kamera gagal dibuka: '+(e?.message||n));
-   }
- }
- function scan(){
-   if(done||!stream||video.readyState<2){raf=requestAnimationFrame(scan);return;}
-   const w=video.videoWidth,h=video.videoHeight;
-   if(w&&h){canvas.width=w;canvas.height=h;ctx.drawImage(video,0,0,w,h);
-     const img=ctx.getImageData(0,0,w,h), code=jsQR(img.data,w,h,{inversionAttempts:'attemptBoth'});
-     if(code?.data){done=true;stop();sendResult(code.data);return;}
-   }
-   raf=requestAnimationFrame(scan);
- }
- function sendResult(qr){
-   // Trust only the opener relationship; parent must still validate QR and GPS server-side.
-   if(!window.opener){say('QR terbaca, tetapi scanner tidak dibuka dari Presensi-Q. Tutup tab ini dan buka lewat tombol Presensi dengan QR.');return;}
-   try{
-     window.opener.postMessage({type:'NEXUS_PRESENSI_QR_RESULT',qr},'https://script.google.com');
-     say('QR terbaca. Hasil dikirim ke tab Presensi-Q. Silakan kembali ke tab tersebut.');
-     setTimeout(()=>window.close(),900);
-   }catch(e){say('QR terbaca, tetapi gagal mengirim hasil ke tab Presensi-Q.');}
- }
- function stop(){if(raf)cancelAnimationFrame(raf);raf=0;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;}
- document.getElementById('start').addEventListener('click',start);
- document.getElementById('stop').addEventListener('click',()=>{stop();say('Kamera ditutup.');});
- window.addEventListener('beforeunload',stop);
+(()=>{
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d',{willReadFrequently:true});
+  const status = document.getElementById('status');
+
+  let stream = null;
+  let raf = 0;
+  let scanning = false;
+  let sending = false;
+  let frameCount = 0;
+
+  const QR_PREFIX = 'NEXUS-PRESENSI:';
+
+  function say(text){
+    status.textContent = text;
+  }
+
+  function stopCamera(){
+    scanning = false;
+
+    if(raf){
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+
+    if(stream){
+      stream.getTracks().forEach(track=>track.stop());
+      stream = null;
+    }
+
+    video.srcObject = null;
+  }
+
+  async function startCamera(){
+    if(scanning) return;
+
+    if(!window.isSecureContext){
+      say('Halaman harus dibuka melalui HTTPS GitHub Pages.');
+      return;
+    }
+
+    if(!navigator.mediaDevices?.getUserMedia){
+      say('Browser tidak mendukung akses kamera.');
+      return;
+    }
+
+    if(typeof window.jsQR !== 'function'){
+      say('Pustaka QR belum termuat. Periksa internet lalu muat ulang.');
+      return;
+    }
+
+    stopCamera();
+    sending = false;
+    frameCount = 0;
+
+    try{
+      say('Meminta akses kamera...');
+
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({
+          video:{
+            facingMode:{ideal:'environment'},
+            width:{ideal:1280},
+            height:{ideal:720}
+          },
+          audio:false
+        });
+      }catch(err){
+        stream = await navigator.mediaDevices.getUserMedia({
+          video:true,
+          audio:false
+        });
+      }
+
+      video.srcObject = stream;
+      await video.play();
+
+      scanning = true;
+      say('Kamera aktif. Arahkan QR ke tengah gambar.');
+      scanFrame();
+
+    }catch(err){
+      const name = err?.name || '';
+
+      if(name === 'NotAllowedError' ||
+         name === 'PermissionDeniedError'){
+        say('Akses kamera ditolak. Periksa izin kamera untuk GitHub Pages.');
+      }else if(name === 'NotFoundError'){
+        say('Kamera tidak ditemukan.');
+      }else{
+        say('Kamera gagal dibuka: ' + (err?.message || name));
+      }
+
+      stopCamera();
+    }
+  }
+
+  function scanFrame(){
+    if(!scanning || sending) return;
+
+    if(video.readyState < 2 ||
+       !video.videoWidth ||
+       !video.videoHeight){
+      raf = requestAnimationFrame(scanFrame);
+      return;
+    }
+
+    try{
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+
+      canvas.width = w;
+      canvas.height = h;
+
+      ctx.drawImage(video,0,0,w,h);
+
+      const image = ctx.getImageData(0,0,w,h);
+
+      const result = window.jsQR(
+        image.data,
+        image.width,
+        image.height,
+        {inversionAttempts:'attemptBoth'}
+      );
+
+      frameCount++;
+
+      if(result && result.data){
+        handleQr(result.data);
+        return;
+      }
+
+      // Indikator agar terlihat proses deteksi tetap berjalan.
+      if(frameCount % 90 === 0){
+        say('Kamera aktif. QR belum terbaca. Dekatkan QR dan pastikan seluruh kotak terlihat.');
+      }
+
+    }catch(err){
+      say('Gagal membaca gambar kamera: ' + (err?.message || err));
+    }
+
+    raf = requestAnimationFrame(scanFrame);
+  }
+
+  function handleQr(value){
+    if(sending) return;
+
+    const qr = String(value || '').trim();
+
+    if(!qr){
+      say('QR terdeteksi tetapi isinya kosong. Coba lagi.');
+      raf = requestAnimationFrame(scanFrame);
+      return;
+    }
+
+    if(!qr.startsWith(QR_PREFIX)){
+      say('QR terdeteksi, tetapi bukan QR Presensi-Q. Arahkan ke QR aktif dari Admin.');
+      raf = requestAnimationFrame(scanFrame);
+      return;
+    }
+
+    sending = true;
+    stopCamera();
+
+    sendResult(qr);
+  }
+
+  function sendResult(qr){
+    if(!window.opener || window.opener.closed){
+      say('QR valid terbaca, tetapi tab Presensi-Q tidak ditemukan. Tutup scanner dan buka kembali dari tombol Presensi dengan QR.');
+      sending = false;
+      return;
+    }
+
+    try{
+      window.opener.postMessage(
+        {
+          type:'NEXUS_PRESENSI_QR_RESULT',
+          qr:qr
+        },
+        'https://script.google.com'
+      );
+
+      say('QR valid terbaca. Hasil dikirim ke tab Presensi-Q. Kembali ke tab Presensi-Q untuk melanjutkan GPS.');
+
+      setTimeout(()=>{
+        window.close();
+      },1200);
+
+    }catch(err){
+      say('QR terbaca, tetapi gagal mengirim hasil. Kembali ke tab Presensi-Q dan coba lagi.');
+      sending = false;
+    }
+  }
+
+  document.getElementById('start')
+    .addEventListener('click',startCamera);
+
+  document.getElementById('stop')
+    .addEventListener('click',()=>{
+      stopCamera();
+      sending = false;
+      say('Kamera ditutup.');
+    });
+
+  window.addEventListener('beforeunload',stopCamera);
+
 })();
-</script></body></html>
+</script>
+</body>
+</html>
